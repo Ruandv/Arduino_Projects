@@ -1,0 +1,11 @@
+{
+  "additionalFiles": "\\ProgramAuthToken.h",
+  "builtInLibrariesFolders": "E:\\Installs\\arduinoide\\libraries",
+  "customBuildProperties": "build.path=e:\\Git\\arduino\\Blynk\\build,build.warn_data_percentage=75,runtime.tools.mkspiffs.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\mkspiffs\\2.5.0-3-20ed2b9,runtime.tools.mkspiffs-2.5.0-3-20ed2b9.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\mkspiffs\\2.5.0-3-20ed2b9,runtime.tools.xtensa-lx106-elf-gcc.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\xtensa-lx106-elf-gcc\\2.5.0-3-20ed2b9,runtime.tools.xtensa-lx106-elf-gcc-2.5.0-3-20ed2b9.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\xtensa-lx106-elf-gcc\\2.5.0-3-20ed2b9,runtime.tools.python.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\python\\3.7.2-post1,runtime.tools.python-3.7.2-post1.path=C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\python\\3.7.2-post1",
+  "fqbn": "esp8266:esp8266:generic:xtal=80,vt=flash,exception=disabled,ssl=all,ResetMethod=ck,CrystalFreq=26,FlashFreq=40,FlashMode=dout,eesz=512K,led=2,sdk=nonosdk221,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200",
+  "hardwareFolders": "E:\\Installs\\arduinoide\\hardware,C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages",
+  "otherLibrariesFolders": "E:\\My Documents\\Arduino\\libraries",
+  "runtime.ide.version": "10809",
+  "sketchLocation": "e:\\Git\\arduino\\Blynk\\Nursery_MQTT\\Nursery_MQTT.ino",
+  "toolsFolders": "E:\\Installs\\arduinoide\\tools-builder,E:\\Installs\\arduinoide\\hardware\\tools\\avr,C:\\Users\\Ruan\\AppData\\Local\\Arduino15\\packages"
+}
