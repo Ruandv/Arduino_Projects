@@ -1,3 +1,7 @@
+#include <FS.h>                   //this needs to be first, or it all crashes and burns...
+
+#include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
+
 //#define BLYNK_PRINT Serial
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -7,12 +11,11 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <WiFiManager.h>
-#include <SimpleTimer.h>
 #include "ProgramAuthToken.h"
 
+//flag for saving data
+bool shouldSaveConfig = false;
 
-
-boolean dayOfWeek[7];
 
 //OTA Setup Variables
 ESP8266WebServer httpServer(80);
@@ -29,7 +32,7 @@ bool isConnected = false;
 bool notificationSend = false;
 
 //SystemParameters
-const String Version = "2.65";  
+const String Version = "2020";
 int durationHour = 3;
 int geyserPin  = 13;
 int geyserStatus = 0;
@@ -40,15 +43,15 @@ String geyserTimeoutTime = "";
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 3500;
 
-SimpleTimer t;
+BlynkTimer t;
 
 BLYNK_CONNECTED() {
-  WriteMessage("Blynk Connected");
+  // WriteMessage("Blynk Connected");
   if (!isConnected)
   {
     WriteMessage("Sync All");
     Blynk.syncAll();
-     
+
     isConnected = true;
   }
   else
@@ -78,10 +81,6 @@ BLYNK_READ(V0)
   Blynk.virtualWrite(0, rssi);
 }
 
-String availableCommands() {
-  WriteMessage("You can only use the following commands :");
-  WriteMessage("GetInfo");
-}
 
 BLYNK_WRITE(V6)
 {
@@ -89,19 +88,29 @@ BLYNK_WRITE(V6)
   WriteMessage("Timeout Duration is now set to : " + String(durationHour));
 }
 
- 
 BLYNK_WRITE(V2)
 {
   String value = param.asStr() ;
-  WriteMessage(value.substring(0, 10));
-  if (String("GetInfo") == value)
+  value.toLowerCase();
+  terminal.clear();
+  if (String("getinfo") == value)
   {
     GetInfo();
-  } 
-  else
+  }
+  else if (String("reset") == value)
   {
-    WriteMessage("I dont understand your command " + String(param.asStr()));
-    availableCommands();
+    WiFiManager wifiManager;
+    wifiManager.resetSettings();
+    WriteMessage("Wifi Settings Reset");
+  }
+  else if (String("restart") == value)
+  {
+    ESP.restart();
+  }
+  else {
+    WriteMessage("getinfo");
+    WriteMessage("reset");
+    WriteMessage("restart");
   }
 }
 
@@ -125,13 +134,18 @@ BLYNK_WRITE(V5)//Time to switch on
   }
 }
 
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
 void toggleGeyser() {
   buttonState = !buttonState;
   digitalWrite(geyserPin, buttonState );
   geyserStatus = digitalRead(geyserPin);
-  if(geyserStatus ==HIGH)
+  if (geyserStatus == HIGH)
   {
-    timerId = t.setTimeout(3600000 * durationHour, durationTimeout);
+    timerId = t.setInterval(3600000 * durationHour, durationTimeout);
     geyserTimeoutTime = String(hour() + durationHour) + ":" + String(minute()) + ":" + String(second());
     geyserLED.on();
   }
@@ -139,7 +153,7 @@ void toggleGeyser() {
   {
     t.deleteTimer(timerId);
     geyserLED.off();
-  } 
+  }
   printGeyserStatus();
 }
 
@@ -149,8 +163,10 @@ void GetInfo() {
                "\r\nSignal :" + String(WiFi.RSSI()) +
                "\r\nIp Address : " +  WiFi.localIP().toString()  +
                "\r\nVersion : " + Version +
-               "\r\nDuration Time : " + String(durationHour)+
-               "\r\Scheduled Time : " + String(switchOn));
+               "\r\nDuration Time : " + String(durationHour) +
+               "\r\nBlynkToken : " + String(blynk_token) +
+               "\r\nGeyserPin : " + String(geyserPin) +
+               "\r\nScheduled Time : " + String(switchOn));
   printGeyserStatus();
 }
 
@@ -166,12 +182,10 @@ void printGeyserStatus() {
 }
 
 void SetupOTA() {
-  WriteMessage("OTA START");
   MDNS.begin(host);
   httpUpdater.setup(&httpServer);
   httpServer.begin();
   MDNS.addService("http", "tcp", 80);
-  WriteMessage("OTA Done");
 }
 
 void setupPinMode()
@@ -182,24 +196,74 @@ void setupPinMode()
 
 void setup()
 {
-  
   Serial.begin(115200);
-  WriteMessage("Setup - START");
-  WriteMessage("Serial Set");
-  setupPinMode();
-  WriteMessage("Pin modes Set");
+  setupFileSystem();
   setupWiFiManager();
-  WriteMessage("WiFi Manager Set");
+  setupPinMode();
   SetupOTA();
-  WriteMessage("Blynk Begin");
-  Blynk.config(auth);
-  WriteMessage("Blynk Complete");
+  Blynk.config(blynk_token);
 }
 
+void setupFileSystem() {
+  //clean FS, for testing
+  SPIFFS.format();
+
+  if (SPIFFS.begin()) {
+    if (SPIFFS.exists("/config.json")) {
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+        DynamicJsonDocument doc(1024);
+        DeserializationError error = deserializeJson(doc, buf.get());
+        if (!error) {
+          WriteMessage("parsed json");
+          strcpy(blynk_token, doc["blynk_token"]);
+          geyserPin = doc[geyserPin].as<int>();
+        } else {
+          WriteMessage("failed to load json config");
+        }
+        configFile.close();
+      }
+    }
+  } else {
+    WriteMessage("failed to mount FS");
+  }
+}
 void setupWiFiManager() {
+  WiFiManagerParameter custom_blynk_token("blynk", "blynk token", blynk_token, 32);
+
+  char cstr[16];
+  itoa(geyserPin, cstr, 10);
+  WiFiManagerParameter custom_geyserPin("GeyserPin", "Geyser Pin", cstr, 16);
+
   WiFiManager wifiManager;
-  wifiManager.setConfigPortalTimeout(240);
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  wifiManager.addParameter(&custom_blynk_token);
+  wifiManager.addParameter(&custom_geyserPin);
   wifiManager.autoConnect(host);
+  strcpy(blynk_token, custom_blynk_token.getValue());
+  char cust[2];
+  strcpy(cust,custom_geyserPin.getValue());
+  geyserPin = atoi(cust);
+  if (shouldSaveConfig) {
+    WriteMessage("saving config");
+    DynamicJsonDocument doc(1024);
+
+    doc["blynk_token"] = blynk_token;
+    doc["geyserPin"] = geyserPin;
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      WriteMessage("failed to open config file for writing");
+    }
+    serializeJson(doc, Serial);
+    serializeJson(doc, configFile);
+    configFile.close();
+  }
 }
 
 void durationTimeout()
@@ -209,16 +273,16 @@ void durationTimeout()
     toggleGeyser();
   }
 }
-  
+
 void loop()
 {
-  if(switchOn >0 ){
+  if (switchOn > 0 ) {
     if ( geyserStatus != HIGH && switchOn == hour())
     {
       toggleGeyser();
     }
   }
   Blynk.run();
-  httpServer.handleClient(); 
+  httpServer.handleClient();
   t.run();
 }
