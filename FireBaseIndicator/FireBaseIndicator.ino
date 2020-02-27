@@ -9,24 +9,25 @@
 #include <Ticker.h>
 #include <Adafruit_GFX.h>
 #include <ArduinoJson.h>
-#include <Adafruit_SSD1306.h>
 
+//LCD DISPLAY
+#include <Adafruit_SSD1306.h>
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-//flag for saving data
-
 Ticker blinker;
 int blinkerCount = 0;
+
 WiFiManager wifiManager;
 
+//LED SETUP
 #define DATA_PIN 12
 #define NUM_LEDS 8
 CRGB leds[NUM_LEDS];
-FirebaseData firebaseData;
 
+FirebaseData firebaseData;
 
 void setLED(int r, int g, int b) {
   leds[0] = CRGB( g, r, b);
@@ -50,12 +51,12 @@ void sucessfulDeployment()
   {
     setLED(0, 0, 0);
   }
-  blinkerCount++;
   if (blinkerCount > 8) {
     setLED(0, 255, 0);
     blinker.detach();
     blinkerCount = 0;
   }
+  blinkerCount++;
 }
 
 void failedDeployment()
