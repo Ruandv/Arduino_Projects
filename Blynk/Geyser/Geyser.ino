@@ -102,6 +102,7 @@ BLYNK_WRITE(V2)
     WiFiManager wifiManager;
     wifiManager.resetSettings();
     WriteMessage("Wifi Settings Reset");
+    ESP.reset();
   }
   else if (String("restart") == value)
   {
@@ -242,10 +243,14 @@ void setupWiFiManager() {
 
   WiFiManager wifiManager;
   wifiManager.setSaveConfigCallback(saveConfigCallback);
-
+  wifiManager.setConfigPortalTimeout(20);
+  
   wifiManager.addParameter(&custom_blynk_token);
   wifiManager.addParameter(&custom_geyserPin);
   wifiManager.autoConnect(host);
+  if(WiFi.status() != WL_CONNECTED) {
+    ESP.reset();
+  }
   strcpy(blynk_token, custom_blynk_token.getValue());
   char cust[2];
   strcpy(cust,custom_geyserPin.getValue());
