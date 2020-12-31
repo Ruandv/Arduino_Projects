@@ -8,3 +8,6 @@
 /Blynk/Geyser_MQTT/ProgramAuthToken.h
 /FireBaseIndicator/FireBaseSetup/functions/.vscode
 /FireBaseIndicator/secrets.h
+/*/ProgramAuthToken.h
+/Nursery/Nursery_Blynk/ProgramAuthToken.h
+/Nursery/Nursery_Firebase/ProgramAuthToken.h

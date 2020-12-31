@@ -1,6 +1,0 @@
-{
-"mqtt_server":"192.168.1.60",
-"mqtt_port":"1883",
-"auth":"5afc683551db46fcac159605436f6a75",
-"rootTopic":"kransberg"
-}
