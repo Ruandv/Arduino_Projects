@@ -1,5 +1,5 @@
 #include "FirebaseESP8266.h"
-
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 
 #include <ESP8266HTTPUpdateServer.h>
@@ -53,7 +53,7 @@ void setupWiFiManager() {
   wifiManager.setConfigPortalTimeout(240);
   wifiManager.autoConnect(host);
 }
-
+String obj = "";
 void SetupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
@@ -64,6 +64,16 @@ void SetupFirebase() {
   Firebase.setReadTimeout(firebaseData, 1000 * 60);
 
   Firebase.setwriteSizeLimit(firebaseData, "tiny");
+  DynamicJsonDocument doc(1024);
+  JsonObject wifi  = doc.createNestedObject("Information");
+  wifi["IPAddress"] = WiFi.localIP().toString();
+  wifi["Version"] = (String)Version;
+  wifi["LEDPin"] = (String)ledPin;
+  wifi["FireBasePath"] = FIREBASEPATH;
+
+  serializeJson(doc, obj);
+  obj.replace("\"", "'" );
+  SetValue(host, obj);
 }
 
 void setup()
@@ -75,11 +85,10 @@ void setup()
   SetupFirebase();
   //Blynk.config(auth);
 }
+
 void loop()
 {
-
   int fbValue = GetValue(FIREBASEPATH);
-  Serial.println(fbValue);
   digitalWrite(ledPin, !fbValue);
   httpServer.handleClient();
 
@@ -89,6 +98,15 @@ int GetValue(String path) {
   Firebase.get(firebaseData, path);
   return firebaseData.intData();
 }
-void SetValue(int value) {
-  Firebase.set(firebaseData, FIREBASEPATH , value);
+void SetValue(String path, int value) {
+  Firebase.set(firebaseData, path, value);
+}
+void SetValue(String path, String value) {
+  if (!Firebase.set(firebaseData, host , value)) {
+
+    Serial.println("FAILED");
+    Serial.println("REASON: " + firebaseData.errorReason());
+    Serial.println("------------------------------------");
+    Serial.println();
+  }
 }
