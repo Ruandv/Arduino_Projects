@@ -1,7 +1,8 @@
 #include "FirebaseESP8266.h"
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
-
+#include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPClient.h>
 #include <ESP8266HTTPUpdateServer.h>
 
 #include <DNSServer.h>
@@ -33,7 +34,24 @@ void GetInfo() {
                "\r\nIp Address : " +  WiFi.localIP().toString()  +
                "\r\nVersion : " + Version);
 }
+void setClock() {
+  // Set time via NTP, as required for x.509 validation
+  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Waiting for NTP time sync: ");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
 
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Current time: ");
+  Serial.print(asctime(&timeinfo));
+
+}
 void SetupOTA() {
   MDNS.begin(host);
   httpUpdater.setup(&httpServer);
@@ -54,7 +72,7 @@ void setupWiFiManager() {
   wifiManager.autoConnect(host);
 }
 String obj = "";
-void SetupFirebase() {
+void setupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
   firebaseData.setBSSLBufferSize(1024, 1024);
@@ -82,8 +100,34 @@ void setup()
   setupPinMode();
   setupWiFiManager();
   SetupOTA();
-  SetupFirebase();
+  setupFirebase();
+  setClock();
+  updateFirmware();
   //Blynk.config(auth);
+}
+void updateFirmware() {
+  return;
+  //getData
+  GetVersionInfo();
+
+
+  Serial.println("New firmware detected");
+  ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(FIRMWAREBASE_URL);
+
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+      break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("HTTP_UPDATE_NO_UPDATES");
+      break;
+
+    case HTTP_UPDATE_OK:
+      Serial.println("HTTP_UPDATE_OK");
+      break;
+  }
 }
 
 void loop()
@@ -97,6 +141,11 @@ void loop()
 int GetValue(String path) {
   Firebase.get(firebaseData, path);
   return firebaseData.intData();
+}
+
+void GetVersionInfo() {
+  Firebase.getJSON(firebaseData, "Version");
+  
 }
 void SetValue(String path, int value) {
   Firebase.set(firebaseData, path, value);
