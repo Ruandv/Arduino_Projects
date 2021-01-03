@@ -163,7 +163,7 @@ int GetValue(String path) {
 }
 
 void GetVersionInfo() {
-  Firebase.getJSON(firebaseData, "Version");
+  Firebase.getJSON(firebaseData, "Version/" + (String)host);
 
 }
 void SetValue(String path, int value) {
