@@ -10,30 +10,14 @@
 #include <ESP8266mDNS.h>
 #include <WiFiManager.h>
 #include "ProgramAuthToken.h"
-
+#include <TimeLib.h>
 
 //OTA Setup Variables
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-
-void WriteMessage(String msg)
-{
-  Serial.println(msg);
-}
-
-String availableCommands() {
-  WriteMessage("You can only use the following commands :");
-  WriteMessage("GetInfo");
-}
-
-
-void GetInfo() {
-  WriteMessage("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
-  WriteMessage("\r\nConnected To : " + WiFi.SSID() +
-               "\r\nSignal :" + String(WiFi.RSSI()) +
-               "\r\nIp Address : " +  WiFi.localIP().toString()  +
-               "\r\nVersion : " + Version);
-}
+String obj = "";
+String obj2 = "";
+bool checked = true;
 
 void setClock() {
   // Set time via NTP, as required for x.509 validation
@@ -46,12 +30,13 @@ void setClock() {
     now = time(nullptr);
   }
 
-  Serial.println("");
-  struct tm timeinfo;
-  gmtime_r(&now, &timeinfo);
-  Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
-
+  /*
+    Serial.println("");
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    Log("Current time: ");
+    Serial.print(asctime(&timeinfo));
+  */
 }
 
 void SetupOTA() {
@@ -73,7 +58,7 @@ void setupWiFiManager() {
   wifiManager.autoConnect(host);
 }
 
-String obj = "";
+
 void setupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
@@ -104,10 +89,10 @@ void setup()
   setupWiFiManager();
   SetupOTA();
   setupFirebase();
-  setClock();
+  //setClock();
   updateFirmware();
-  //Blynk.config(auth);
 }
+
 void updateFirmware() {
   GetVersionInfo();
   const String json = firebaseData.stringData();
@@ -119,22 +104,23 @@ void updateFirmware() {
   Serial.println("Version " + (String)Version);
   if ((String)DBVersion != (String)Version)
   {
-    Serial.println("New firmware detected");
+    LogInfo("New firmware detected");
     ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
-    Serial.println("Downloading file... " + (String)FIRMWARE_URL );
+    LogInfo("Downloading file... " + (String)FIRMWARE_URL );
     t_httpUpdate_return ret = ESPhttpUpdate.update(FIRMWARE_URL);
 
     switch (ret) {
       case HTTP_UPDATE_FAILED:
+        LogInfo(((String)"Update failed  - HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str()));
         Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
         break;
 
       case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        LogInfo("HTTP_UPDATE_NO_UPDATES");
         break;
 
       case HTTP_UPDATE_OK:
-        Serial.println("HTTP_UPDATE_OK");
+        LogInfo("HTTP_UPDATE_OK");
         break;
     }
   }
@@ -143,7 +129,8 @@ void updateFirmware() {
     Serial.println("firmware up to date");
   }
 }
-bool checked = true;
+
+
 void loop()
 {
   int fbValue = GetValue(FIREBASEPATH);
@@ -164,14 +151,18 @@ int GetValue(String path) {
 
 void GetVersionInfo() {
   Firebase.getJSON(firebaseData, "Version/" + (String)host);
-
 }
+
 void SetValue(String path, int value) {
   Firebase.set(firebaseData,FIREBASEROOT+ path, value);
 }
 
+void LogInfo(String json) {
+  Firebase.set(firebaseData,"LOGS/"+(String)host+"/s"+(String)millis(), json);
+}
+
 void SetValue(String path, String value) {
-  if (!Firebase.set(firebaseData, (String)FIREBASEROOT+"/"+(String)host , value)) {
+  if (!Firebase.set(firebaseData, (String)FIREBASEROOT+"/"+(String)path , value)) {
 
     Serial.println("FAILED");
     Serial.println("REASON: " + firebaseData.errorReason());
