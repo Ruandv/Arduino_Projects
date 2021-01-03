@@ -1,16 +1,12 @@
 #include "Arduino.h"
 
-char* auth = "";
-char* Version = "3.1";
-char* host = "Nursery Firebase";
+char* Version = "3.7";
+char* host = "YourHost";
 const int sensorPin = 12;
 const int ledPin = 13;
 
-#define FIREBASE_HOST "" //Without http:// or https:// schemes
+#define FIREBASE_HOST ".firebaseio.com" //Without http:// or https:// schemes
 #define FIREBASE_AUTH ""
 
-#define FIREBASEPATH ""
+#define FIREBASEPATH "NB"
 FirebaseData firebaseData;
-FirebaseJson json;
-
-void printResult(FirebaseData &data);

@@ -34,6 +34,7 @@ void GetInfo() {
                "\r\nIp Address : " +  WiFi.localIP().toString()  +
                "\r\nVersion : " + Version);
 }
+
 void setClock() {
   // Set time via NTP, as required for x.509 validation
   configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
@@ -52,6 +53,7 @@ void setClock() {
   Serial.print(asctime(&timeinfo));
 
 }
+
 void SetupOTA() {
   MDNS.begin(host);
   httpUpdater.setup(&httpServer);
@@ -65,12 +67,12 @@ void setupPinMode()
   pinMode(ledPin, OUTPUT);
 }
 
-
 void setupWiFiManager() {
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(240);
   wifiManager.autoConnect(host);
 }
+
 String obj = "";
 void setupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
@@ -106,36 +108,52 @@ void setup()
   //Blynk.config(auth);
 }
 void updateFirmware() {
-  return;
-  //getData
   GetVersionInfo();
+  const String json = firebaseData.stringData();
+  StaticJsonDocument<200> doc;
+  deserializeJson(doc, json);
+  const char* DBVersion = doc["Version"];
+  const char* FIRMWARE_URL = doc["URL"];
+  Serial.println("DBVersion " + (String) DBVersion);
+  Serial.println("Version " + (String)Version);
+  if ((String)DBVersion != (String)Version)
+  {
+    Serial.println("New firmware detected");
+    ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
+    Serial.println("Downloading file... " + (String)FIRMWARE_URL );
+    t_httpUpdate_return ret = ESPhttpUpdate.update(FIRMWARE_URL);
 
+    switch (ret) {
+      case HTTP_UPDATE_FAILED:
+        Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        break;
 
-  Serial.println("New firmware detected");
-  ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(FIRMWAREBASE_URL);
+      case HTTP_UPDATE_NO_UPDATES:
+        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        break;
 
-  switch (ret) {
-    case HTTP_UPDATE_FAILED:
-      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-      break;
-
-    case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("HTTP_UPDATE_NO_UPDATES");
-      break;
-
-    case HTTP_UPDATE_OK:
-      Serial.println("HTTP_UPDATE_OK");
-      break;
+      case HTTP_UPDATE_OK:
+        Serial.println("HTTP_UPDATE_OK");
+        break;
+    }
+  }
+  else
+  {
+    Serial.println("firmware up to date");
   }
 }
-
+bool checked = true;
 void loop()
 {
   int fbValue = GetValue(FIREBASEPATH);
   digitalWrite(ledPin, !fbValue);
   httpServer.handleClient();
+  if (fbValue == 1 && checked == false)
+  {
+    updateFirmware();
+  }
 
+  checked = fbValue;
 }
 
 int GetValue(String path) {
@@ -145,7 +163,7 @@ int GetValue(String path) {
 
 void GetVersionInfo() {
   Firebase.getJSON(firebaseData, "Version");
-  
+
 }
 void SetValue(String path, int value) {
   Firebase.set(firebaseData, path, value);
