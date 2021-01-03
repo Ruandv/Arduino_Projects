@@ -88,7 +88,8 @@ void updateFirmware() {
   StaticJsonDocument<200> doc;
   deserializeJson(doc, firebaseData.stringData());
   const char* DBVersion = doc["Version"];
-  const char* FIRMWARE_URL = doc["URL"];
+  String FIRMWARE_URL = doc["URL"];
+  FIRMWARE_URL.replace("{version}",DBVersion);
   Serial.println("DBVersion " + (String) DBVersion);
   Serial.println("Version " + (String)Version);
   if ((String)DBVersion != (String)Version)

@@ -147,7 +147,8 @@ void updateFirmware() {
   StaticJsonDocument<200> doc;
   deserializeJson(doc, json);
   const char* DBVersion = doc["Version"];
-  const char* FIRMWARE_URL = doc["URL"];
+  String FIRMWARE_URL = doc["URL"];
+  FIRMWARE_URL.replace("{version}",DBVersion);
   WriteMessage("DBVersion " + (String) DBVersion);
   WriteMessage("Version " + (String)Version);
   if ((String)DBVersion != (String)Version)
