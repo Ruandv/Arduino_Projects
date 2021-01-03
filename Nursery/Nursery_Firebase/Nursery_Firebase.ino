@@ -15,28 +15,18 @@
 //OTA Setup Variables
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
-String obj = "";
-String obj2 = "";
+
 bool checked = true;
 
 void setClock() {
-  // Set time via NTP, as required for x.509 validation
-  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  Serial.print("Waiting for NTP time sync: ");
+  configTime(TIME_ZONE, "pool.ntp.org");
   time_t now = time(nullptr);
-  while (now < 8 * 3600 * 2) {
-    delay(500);
-    Serial.print(".");
+  while (now < SECS_YR_2000) {
+    delay(100);
     now = time(nullptr);
   }
-
-  /*
-    Serial.println("");
-    struct tm timeinfo;
-    gmtime_r(&now, &timeinfo);
-    Log("Current time: ");
-    Serial.print(asctime(&timeinfo));
-  */
+  setTime(now);
+  LogInfo("Time Sync: Success ");
 }
 
 void SetupOTA() {
@@ -58,7 +48,6 @@ void setupWiFiManager() {
   wifiManager.autoConnect(host);
 }
 
-
 void setupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
@@ -69,6 +58,7 @@ void setupFirebase() {
   Firebase.setReadTimeout(firebaseData, 1000 * 60);
 
   Firebase.setwriteSizeLimit(firebaseData, "tiny");
+  String obj = "";
   DynamicJsonDocument doc(1024);
   JsonObject wifi  = doc.createNestedObject("Information");
   wifi["IPAddress"] = WiFi.localIP().toString();
@@ -87,17 +77,16 @@ void setup()
   Serial.begin(115200);
   setupPinMode();
   setupWiFiManager();
-  SetupOTA();
+  SetupOTA();  
   setupFirebase();
-  //setClock();
+  setClock();
   updateFirmware();
 }
 
 void updateFirmware() {
   GetVersionInfo();
-  const String json = firebaseData.stringData();
   StaticJsonDocument<200> doc;
-  deserializeJson(doc, json);
+  deserializeJson(doc, firebaseData.stringData());
   const char* DBVersion = doc["Version"];
   const char* FIRMWARE_URL = doc["URL"];
   Serial.println("DBVersion " + (String) DBVersion);
@@ -140,7 +129,6 @@ void loop()
   {
     updateFirmware();
   }
-
   checked = fbValue;
 }
 
@@ -158,7 +146,8 @@ void SetValue(String path, int value) {
 }
 
 void LogInfo(String json) {
-  Firebase.set(firebaseData,"LOGS/"+(String)host+"/s"+(String)millis(), json);
+  String logId = (String)year()+"_"+(String)month()+"_"+(String)day()+"/"+(String)hour()+"_"+(String)minute()+"_"+(String)second();
+  Firebase.set(firebaseData,"LOGS/"+(String)host+"/"+logId, json);
 }
 
 void SetValue(String path, String value) {
