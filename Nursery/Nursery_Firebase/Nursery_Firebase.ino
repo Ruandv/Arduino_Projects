@@ -89,6 +89,7 @@ void setupFirebase() {
   wifi["IPAddress"] = WiFi.localIP().toString();
   wifi["Version"] = (String)Version;
   wifi["LEDPin"] = (String)ledPin;
+  wifi["FireBaseRoot"] = FIREBASEROOT;
   wifi["FireBasePath"] = FIREBASEPATH;
 
   serializeJson(doc, obj);
@@ -157,7 +158,7 @@ void loop()
 }
 
 int GetValue(String path) {
-  Firebase.get(firebaseData, path);
+  Firebase.get(firebaseData, (String)FIREBASEROOT+ path);
   return firebaseData.intData();
 }
 
@@ -166,10 +167,11 @@ void GetVersionInfo() {
 
 }
 void SetValue(String path, int value) {
-  Firebase.set(firebaseData, path, value);
+  Firebase.set(firebaseData,FIREBASEROOT+ path, value);
 }
+
 void SetValue(String path, String value) {
-  if (!Firebase.set(firebaseData, host , value)) {
+  if (!Firebase.set(firebaseData, (String)FIREBASEROOT+"/"+(String)host , value)) {
 
     Serial.println("FAILED");
     Serial.println("REASON: " + firebaseData.errorReason());

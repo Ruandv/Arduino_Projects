@@ -1,9 +1,14 @@
-#include "FirebaseESP8266.h"
 #define BLYNK_PRINT Serial
-#include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
-#include <ESP8266HTTPUpdateServer.h>
 #include <WidgetRTC.h>
+
+#include "FirebaseESP8266.h"
+#include <ArduinoJson.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266HTTPUpdateServer.h>
+
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
@@ -48,11 +53,13 @@ void WriteMessage(String msg)
     terminal.flush();
   }
   Serial.println(msg);
+  Blynk.run();
 }
 
 String availableCommands() {
   WriteMessage("You can only use the following commands :");
   WriteMessage("GetInfo");
+  WriteMessage("Update");
 }
 
 BLYNK_WRITE(V2)
@@ -63,6 +70,9 @@ BLYNK_WRITE(V2)
   {
     GetInfo();
   }
+  else if (String("Update") == value) {
+    updateFirmware();
+  }
   else
   {
     WriteMessage("I dont understand your command " + String(param.asStr()));
@@ -70,10 +80,10 @@ BLYNK_WRITE(V2)
   }
 }
 
-BLYNK_WRITE(V3){
+BLYNK_WRITE(V3) {
   int value = param.asInt() ;
-  digitalWrite(ledPin,value);
-  SetValue(value);
+  digitalWrite(ledPin, value);
+  SetValue(FIREBASEPATH, value);
 }
 
 void GetInfo() {
@@ -103,20 +113,71 @@ void setupWiFiManager() {
   wifiManager.autoConnect(host);
 }
 
-void SetupFirebase() {
+String obj = "";
+void setupFirebase() {
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
   Firebase.reconnectWiFi(true);
-  //Set the size of WiFi rx/tx buffers in the case where we want to work with large data.
   firebaseData.setBSSLBufferSize(1024, 1024);
 
-  //Set the size of HTTP response buffers in the case where we want to work with large data.
   firebaseData.setResponseSize(1024);
 
-  //Set database read timeout to 1 minute (max 15 minutes)
   Firebase.setReadTimeout(firebaseData, 1000 * 60);
-  //tiny, small, medium, large and unlimited.
-  //Size and its write timeout e.g. tiny (1s), small (10s), medium (30s) and large (60s).
+
   Firebase.setwriteSizeLimit(firebaseData, "tiny");
+  DynamicJsonDocument doc(1024);
+  JsonObject wifi  = doc.createNestedObject("Information");
+  wifi["IPAddress"] = WiFi.localIP().toString();
+  wifi["Version"] = (String)Version;
+  wifi["LEDPin"] = (String)ledPin;
+  wifi["FireBaseRoot"] = FIREBASEROOT;
+  wifi["FireBasePath"] = FIREBASEPATH;
+
+  serializeJson(doc, obj);
+  obj.replace("\"", "'" );
+  SetValue(host, obj);
+}
+
+void GetVersionInfo() {
+  Firebase.getJSON(firebaseData, "Version/" + (String)host);
+
+}
+void updateFirmware() {
+  GetVersionInfo();
+  const String json = firebaseData.stringData();
+  StaticJsonDocument<200> doc;
+  deserializeJson(doc, json);
+  const char* DBVersion = doc["Version"];
+  const char* FIRMWARE_URL = doc["URL"];
+  WriteMessage("DBVersion " + (String) DBVersion);
+  WriteMessage("Version " + (String)Version);
+  if ((String)DBVersion != (String)Version)
+  {
+    WriteMessage("New firmware detected");
+    ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
+    WriteMessage("Downloading file... " + (String)FIRMWARE_URL );
+    t_httpUpdate_return ret = ESPhttpUpdate.update(FIRMWARE_URL);
+
+    switch (ret) {
+      case HTTP_UPDATE_FAILED:
+        //String msg = "HTTP_UPDATE_FAILD Error " + (String)ESPhttpUpdate.getLastError() + ": " + ESPhttpUpdate.getLastErrorString().c_str();
+        WriteMessage("Update Failed");
+        WriteMessage((String)ESPhttpUpdate.getLastError());
+        WriteMessage(ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+
+      case HTTP_UPDATE_NO_UPDATES:
+        WriteMessage("HTTP UPDATE NO UPDATES");
+        break;
+
+      case HTTP_UPDATE_OK:
+        WriteMessage("HTTP UPDATE OK");
+        break;
+    }
+  }
+  else
+  {
+    Serial.println("firmware up to date");
+  }
 }
 
 void setup()
@@ -125,23 +186,12 @@ void setup()
   setupPinMode();
   setupWiFiManager();
   SetupOTA();
-  SetupFirebase();
+  setupFirebase();
   Blynk.config(auth);
 }
+
 void loop()
 {
-  if (GetValue(FIREBASEPATH) == "B") {
-    int value = analogRead(ledPin);
-
-    for (int i = 0; i < 4; i++)
-    {
-      digitalWrite(ledPin, HIGH);
-      delay(500);
-      digitalWrite(ledPin, HIGH);
-      delay(500);
-    }
-    analogWrite(ledPin, value);
-  }
   Blynk.run();
   httpServer.handleClient();
 }
@@ -150,6 +200,17 @@ String GetValue(String path) {
   Firebase.getString(firebaseData, path);
   return firebaseData.stringData();
 }
-void SetValue(int value) {
-  Firebase.set(firebaseData, FIREBASEPATH , value);
+
+void SetValue(String path, int value) {
+  Firebase.set(firebaseData, FIREBASEROOT + path, value);
+}
+
+void SetValue(String path, String value) {
+  if (!Firebase.set(firebaseData, (String)FIREBASEROOT + "/" + (String)host , value)) {
+
+    Serial.println("FAILED");
+    Serial.println("REASON: " + firebaseData.errorReason());
+    Serial.println("------------------------------------");
+    Serial.println();
+  }
 }
